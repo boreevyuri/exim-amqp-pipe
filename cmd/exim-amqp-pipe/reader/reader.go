@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-func readStdin() (data []byte, err error) {
+func ReadStdin() (data []byte, err error) {
 	var errInput = errors.New("no input specified")
 
 	inputData, err := os.Stdin.Stat()
