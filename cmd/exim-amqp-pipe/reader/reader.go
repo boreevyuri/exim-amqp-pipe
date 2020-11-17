@@ -1,28 +1,30 @@
 package reader
 
 import (
-	"bufio"
 	"errors"
+	"io/ioutil"
+	"log"
 	"os"
 )
 
-func ReadStdin() (data []byte, err error) {
+func ReadStdin() (data []byte) {
 	var errInput = errors.New("no input specified")
 
 	inputData, err := os.Stdin.Stat()
-	if err != nil {
-		return nil, err
-	}
+	failOnError(err, "no input specified(1):")
 
 	if (inputData.Mode() & os.ModeNamedPipe) == 0 {
-		return nil, errInput
+		failOnError(errInput, "no input specified(2):")
 	}
 
-	scanner := bufio.NewScanner(os.Stdin)
-	if !scanner.Scan() {
-		return nil, scanner.Err()
-	}
-	data = scanner.Bytes()
+	data, err = ioutil.ReadAll(os.Stdin)
+	failOnError(err, "Unable to read os.Stdin:")
 
-	return data, nil
+	return data
+}
+
+func failOnError(err error, msg string) {
+	if err != nil {
+		log.Fatalf("%s, %s", msg, err)
+	}
 }
