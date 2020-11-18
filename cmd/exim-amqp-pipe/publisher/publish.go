@@ -14,8 +14,7 @@ const (
 )
 
 type commandData struct {
-	action commandAction
-	//publishing  []byte
+	action     commandAction
 	publishing amqp.Publishing
 	result     chan<- bool
 }
@@ -49,7 +48,7 @@ func (pa processAmqp) run(amqpConf config.AmqpConfig) {
 	command := <-pa
 	switch command.action {
 	case publish:
-		log.Printf("Got Publish signal")
+		log.Printf("Got Parse signal")
 		err = publishData(ch, binding.QueueName, command.publishing)
 		failOnError(err, "Failed to publish a message:")
 		command.result <- true
@@ -99,11 +98,9 @@ type ProcessAmqp interface {
 	Finish() bool
 }
 
-func New(confFile string) ProcessAmqp {
-	var conf config.Conf
-	conf.GetConf(confFile)
+func New(amqpConfig config.AmqpConfig) ProcessAmqp {
 	amqpPipe := make(processAmqp)
-	go amqpPipe.run(conf.Amqp)
+	go amqpPipe.run(amqpConfig)
 	return amqpPipe
 }
 

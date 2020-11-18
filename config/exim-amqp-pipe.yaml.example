@@ -1,6 +1,14 @@
+# AMQP settings
 amqp:
-  - uri: amqp://guest:guest@127.0.0.1:5672/exim
-    bindings:
-      - exchange: exim
-        queue: exim
-        type: fanout
+  uri: amqp://guest:guest@127.0.0.1:5672/exim
+  bindings:
+    exchange: exim
+    queue: exim
+    type: fanout
+
+publish:
+  # Turning attachments_only to "false" enables full message publishing
+  # attachments_only - publishes attachments from message
+  attachments_only: true
+  # embedded_files - publishes embedded files with attachments
+  embedded_files: true

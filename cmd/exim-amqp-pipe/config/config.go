@@ -15,7 +15,8 @@ type ExchangeType string
 //)
 
 type Conf struct {
-	Amqp AmqpConfig `yaml:"amqp"`
+	Amqp  AmqpConfig  `yaml:"amqp"`
+	Parse ParseConfig `yaml:"publish"`
 }
 
 type AmqpConfig struct {
@@ -29,6 +30,11 @@ type QueueConfig struct {
 	QueueName string       `yaml:"queue"`
 	Type      ExchangeType `yaml:"type"`
 	Routing   string       `yaml:"routing"`
+}
+
+type ParseConfig struct {
+	AttachmentsOnly   bool `yaml:"attachments_only"`
+	WithEmbeddedFiles bool `yaml:"embedded_files"`
 }
 
 func (c *Conf) GetConf(filename string) *Conf {
