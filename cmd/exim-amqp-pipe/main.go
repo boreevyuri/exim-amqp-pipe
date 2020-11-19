@@ -20,18 +20,20 @@ func main() {
 	flag.StringVar(&confFile, "c", defaultConfigFile, "configuration file")
 	flag.Parse()
 
-	//dataChan := make(chan []byte)
-	//done := make(chan bool)
-
 	conf.GetConf(confFile)
-	queue := publisher.New(conf.Amqp)
 
-	//reader.Parse(conf.Parse)
-	dataChan := reader.Parse(conf.Parse)
+	donePublish := make(chan bool)
+	publishChan := make(chan string)
+	parseChan := make(chan string)
 
-	for _, data := range <-dataChan {
-		queue.Publish(data)
+	go publisher.NewPublish(donePublish, publishChan, conf.Amqp)
+	go reader.Parse(parseChan, conf.Parse)
+
+	for data := range parseChan {
+		publishChan <- data
 	}
-	//mail := reader.ReadStdin()
-	//queue.Publish(mail)
+	close(publishChan)
+
+	//<-doneParse
+	<-donePublish
 }

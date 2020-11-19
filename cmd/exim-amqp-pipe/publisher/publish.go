@@ -1,29 +1,15 @@
 package publisher
 
 import (
+	"fmt"
 	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/config"
 	"github.com/streadway/amqp"
 	"log"
 )
 
-type commandAction int
+func NewPublish(done chan<- bool, incoming chan string, config config.AmqpConfig) {
 
-const (
-	publish commandAction = iota
-	finish
-)
-
-type commandData struct {
-	action     commandAction
-	publishing amqp.Publishing
-	result     chan<- bool
-}
-
-type processAmqp chan commandData
-
-func (pa processAmqp) run(amqpConf config.AmqpConfig) {
-	uri, binding := amqpConf.URI, amqpConf.QueueBind
-
+	uri, binding := config.URI, config.QueueBind
 	conn, err := amqp.Dial(uri)
 	failOnError(err, "Failed to connect to RabbitMQ:")
 	defer conn.Close()
@@ -42,66 +28,30 @@ func (pa processAmqp) run(amqpConf config.AmqpConfig) {
 	)
 	failOnError(err, "Failed to declare a queue:")
 
-	//exchange := binding.Exchange
+	fmt.Printf("Connection successful. Publisher waits for data...\n")
 
-	//for command := range pa {
-	command := <-pa
-	switch command.action {
-	case publish:
-		log.Printf("Got Parse signal")
-		err = publishData(ch, binding.QueueName, command.publishing)
-		failOnError(err, "Failed to publish a message:")
-		command.result <- true
-	case finish:
-		log.Printf("Got Finish signal")
-		close(pa)
+	for data := range incoming {
+		fmt.Printf("Incoming Data %d bytes\n", len(data))
+		value := []byte(data)
+		err := ch.Publish(
+			"",
+			binding.QueueName,
+			false,
+			false,
+			amqp.Publishing{
+				ContentType: "text/plain",
+				Body:        value,
+			},
+		)
+		if err != nil {
+			failOnError(err, "Failed to publish message:")
+		}
+		fmt.Printf("Data published\n")
 	}
-	//}
-}
 
-func (pa processAmqp) Publish(value []byte) bool {
-	reply := make(chan bool)
-	pa <- commandData{
-		action: publish,
-		publishing: amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        value,
-		},
-		result: reply,
-	}
-	return <-reply
-}
+	fmt.Printf("Incoming channel closed. Publisher exited\n")
+	done <- true
 
-func (pa processAmqp) Finish() bool {
-	reply := make(chan bool)
-	pa <- commandData{
-		action: finish,
-		//publishing:  nil,
-		result: reply,
-	}
-	return <-reply
-}
-
-func publishData(ch *amqp.Channel, name string, value amqp.Publishing) error {
-	err := ch.Publish(
-		"",
-		name,
-		false,
-		false,
-		value,
-	)
-	return err
-}
-
-type ProcessAmqp interface {
-	Publish(value []byte) bool
-	Finish() bool
-}
-
-func New(amqpConfig config.AmqpConfig) ProcessAmqp {
-	amqpPipe := make(processAmqp)
-	go amqpPipe.run(amqpConfig)
-	return amqpPipe
 }
 
 func failOnError(err error, msg string) {

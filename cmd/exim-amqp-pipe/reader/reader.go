@@ -1,7 +1,9 @@
 package reader
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/config"
 	"io/ioutil"
 	"log"
@@ -9,7 +11,7 @@ import (
 	"os"
 )
 
-func ReadStdin() (msg []byte) {
+func ReadStdin() string {
 	var errInput = errors.New("no input specified")
 
 	inputData, err := os.Stdin.Stat()
@@ -19,10 +21,10 @@ func ReadStdin() (msg []byte) {
 		failOnError(errInput, "no input specified(2):")
 	}
 
-	msg, err = ioutil.ReadAll(os.Stdin)
+	data, err := ioutil.ReadAll(os.Stdin)
 	failOnError(err, "Unable to readAll os.Stdin:")
 
-	return msg
+	return string(data)
 }
 
 func ReadMail() (msg *mail.Message) {
@@ -41,97 +43,34 @@ func ReadMail() (msg *mail.Message) {
 	return msg
 }
 
-//type commandAction int
-//
-//const (
-//	readAll commandAction = iota
-//	parseAttach
-//	parseEmbed
-//)
-//
-//type commandData struct {
-//	action commandAction
-//	result chan<- []byte
-//}
-//
-//type processMessage chan commandData
-//
-//func (pm processMessage) ParseAttach() []byte {
-//	reply := make(chan []byte)
-//	pm <- commandData{
-//		action: parseAttach,
-//		result: reply,
-//	}
-//	return <-reply
-//}
-//
-//func (pm processMessage) ParseEmbed() []byte {
-//	reply := make(chan []byte)
-//	pm <- commandData{
-//		action: parseEmbed,
-//		result: reply,
-//	}
-//	return <-reply
-//}
-//
-//func (pm processMessage) run(parseConf config.ParseConfig) {
-//	data := ReadStdin()
-//	if !parseConf.WithEmbeddedFiles {
-//
-//	}
-//	for command := range pm {
-//		switch command.action {
-//		case readAll:
-//			log.Printf("Got readAll signal")
-//		case parseAttach:
-//			log.Printf("Got parseAttach signal")
-//		case parseEmbed:
-//			log.Printf("Got parseEmbed signal")
-//		}
-//	}
-//}
-//
-//
-//type ProcessMessage interface {
-//	ParseAttach() bool
-//	ParseEmbed() bool
-//}
-//
-//func New(parseConfig config.ParseConfig) ProcessMessage {
-//	readerPipe := make(processMessage)
-//	go readerPipe.run(parseConfig)
-//	return readerPipe
-//}
+//func Parse(out chan<- string, done chan<- bool, parseConf config.ParseConfig) <-chan string {
+func Parse(outgoing chan string, parseConf config.ParseConfig) {
 
-func Parse(parseConf config.ParseConfig) (reply chan string) {
-	reply = make(chan string)
-	defer close(reply)
+	if !parseConf.AttachmentsOnly {
+		data := ReadStdin()
+		outgoing <- data
+		close(outgoing)
+	}
 
-	//if !parseConf.AttachmentsOnly {
-	//	data := ReadStdin()
-	//	reply <- data
-	//	return reply
-	//}
-
+	//go func() {
 	message := ReadMail()
 	email, err := ParseMail(message)
 	if err != nil {
 		failOnError(err, "Unable to parse email:")
 	}
 
-	log.Printf("Attachments found: %d", len(email.Attachments))
+	log.Printf("Attachments found: %d", len(email.Files))
 
-	for _, attachment := range email.Attachments {
-
-		reply <- attachment.Data
-		//fmt.Println(reflect.TypeOf(attachment.Data).String())
+	for _, file := range email.Files {
+		var buffer bytes.Buffer
+		buffer.Write(file.Data)
+		fmt.Printf("Got file with len %d bytes\n", buffer.Len())
+		outgoing <- string(buffer.Bytes())
+		//fmt.Println(reflect.TypeOf(file.Data).String())
 	}
-
-	for _, embeddedFile := range email.EmbeddedFiles {
-		reply <- embeddedFile.Data
-	}
-
-	return reply
+	fmt.Printf("All files gone. Closing Parse\n")
+	close(outgoing)
+	//done <- true
 }
 
 func failOnError(err error, msg string) {
