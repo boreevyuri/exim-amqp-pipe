@@ -23,8 +23,11 @@ func main() {
 	conf.GetConf(confFile)
 
 	donePublish := make(chan bool)
-	publishChan := make(chan string)
-	parseChan := make(chan string)
+	//publishChan := make(chan string)
+	//parseChan := make(chan string)
+
+	parseChan := make(chan reader.File)
+	publishChan := make(chan reader.File)
 
 	go publisher.NewPublish(donePublish, publishChan, conf.Amqp)
 	go reader.Parse(parseChan, conf.Parse)
@@ -34,6 +37,5 @@ func main() {
 	}
 	close(publishChan)
 
-	//<-doneParse
 	<-donePublish
 }

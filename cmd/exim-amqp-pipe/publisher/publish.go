@@ -3,11 +3,12 @@ package publisher
 import (
 	"fmt"
 	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/config"
+	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/reader"
 	"github.com/streadway/amqp"
 	"log"
 )
 
-func NewPublish(done chan<- bool, incoming chan string, config config.AmqpConfig) {
+func NewPublish(done chan<- bool, incoming chan reader.File, config config.AmqpConfig) {
 
 	uri, binding := config.URI, config.QueueBind
 	conn, err := amqp.Dial(uri)
@@ -30,17 +31,20 @@ func NewPublish(done chan<- bool, incoming chan string, config config.AmqpConfig
 
 	fmt.Printf("Connection successful. Publisher waits for data...\n")
 
-	for data := range incoming {
-		fmt.Printf("Incoming Data %d bytes\n", len(data))
-		value := []byte(data)
+	for file := range incoming {
+		//fmt.Printf("Incoming Data %d bytes\n", len(data))
+		fmt.Printf("Incoming File %d bytes, name: %s\n", len(file.Data), file.Filename)
+		//value := []byte(data)
 		err := ch.Publish(
 			"",
 			binding.QueueName,
 			false,
 			false,
 			amqp.Publishing{
-				ContentType: "text/plain",
-				Body:        value,
+				ContentType:     file.ContentType,
+				ContentEncoding: file.ContentEncoding,
+				//ContentType: "application/octet-stream",
+				Body: file.Data,
 			},
 		)
 		if err != nil {
