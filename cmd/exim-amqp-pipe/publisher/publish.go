@@ -1,14 +1,13 @@
 package publisher
 
 import (
-	"fmt"
 	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/config"
 	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/reader"
 	"github.com/streadway/amqp"
 	"log"
 )
 
-func NewPublish(done chan<- bool, incoming chan reader.File, config config.AmqpConfig) {
+func PublishFiles(done chan<- bool, files chan reader.File, config config.AmqpConfig) {
 
 	uri, binding := config.URI, config.QueueBind
 	conn, err := amqp.Dial(uri)
@@ -29,12 +28,10 @@ func NewPublish(done chan<- bool, incoming chan reader.File, config config.AmqpC
 	)
 	failOnError(err, "Failed to declare a queue:")
 
-	fmt.Printf("Connection successful. Publisher waits for data...\n")
+	//fmt.Printf("Connection successful. Publisher waits for data...\n")
 
-	for file := range incoming {
-		//fmt.Printf("Incoming Data %d bytes\n", len(data))
-		fmt.Printf("Incoming File %d bytes, name: %s\n", len(file.Data), file.Filename)
-		//value := []byte(data)
+	for file := range files {
+		//fmt.Printf("Incoming File %d bytes, name: %s\n", len(file.Data), file.Filename)
 		err := ch.Publish(
 			"",
 			binding.QueueName,
@@ -43,17 +40,16 @@ func NewPublish(done chan<- bool, incoming chan reader.File, config config.AmqpC
 			amqp.Publishing{
 				ContentType:     file.ContentType,
 				ContentEncoding: file.ContentEncoding,
-				//ContentType: "application/octet-stream",
-				Body: file.Data,
+				Body:            file.Data,
 			},
 		)
 		if err != nil {
 			failOnError(err, "Failed to publish message:")
 		}
-		fmt.Printf("Data published\n")
+		//fmt.Printf("Data published\n")
 	}
 
-	fmt.Printf("Incoming channel closed. Publisher exited\n")
+	//fmt.Printf("Incoming channel closed. Publisher exited\n")
 	done <- true
 
 }

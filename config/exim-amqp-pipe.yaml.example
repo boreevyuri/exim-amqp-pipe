@@ -10,3 +10,5 @@ publish:
   # Turning attachments_only to "false" enables full message publishing
   # attachments_only - publishes attachments end embedded files from message
   attachments_only: true
+
+debug: false
