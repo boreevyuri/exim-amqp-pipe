@@ -1,6 +1,7 @@
 package reader
 
 import (
+	"errors"
 	"fmt"
 	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/config"
 	"io"
@@ -13,7 +14,7 @@ import (
 
 const (
 	contentTypeHeader        = "Content-Type"
-	contentIdHeader          = "Content-Id"
+	contentIDHeader          = "Content-Id"
 	contentTransferEncHeader = "Content-Transfer-Encoding"
 	mixed                    = "multipart/mixed"
 	alternative              = "multipart/alternative"
@@ -37,18 +38,22 @@ func ScanEmail(conf config.ParseConfig, msg *mail.Message) (files []File) {
 		if err != nil {
 			failOnError(err, "Unable to parse email:")
 		}
+
 		return files
+
 	default:
 		files, err := ScanFullLetter(msg)
 		if err != nil {
 			failOnError(err, "Unable to parse email:")
 		}
+
 		return files
 	}
 }
 
 func ScanFullLetter(msg *mail.Message) (files []File, err error) {
 	data := new(File)
+
 	contentType := msg.Header.Get(contentTypeHeader)
 	if len(contentType) == 0 {
 		contentType = plain
@@ -66,11 +71,11 @@ func ScanFullLetter(msg *mail.Message) (files []File, err error) {
 	data.ContentEncoding = plain
 
 	files = append(files, *data)
+
 	return files, err
 }
 
 func GetFilesFrom(msg *mail.Message) (files []File, err error) {
-
 	contentType, params, err := parseContentType(msg.Header.Get(contentTypeHeader))
 	failOnError(err, "Unable to parse email Content-Type")
 
@@ -82,11 +87,11 @@ func GetFilesFrom(msg *mail.Message) (files []File, err error) {
 	default:
 		return
 	}
+
 	return files, err
 }
 
 func parseContentType(header string) (contentType string, params map[string]string, err error) {
-
 	if header == "" {
 		contentType = plain
 		return
@@ -96,15 +101,16 @@ func parseContentType(header string) (contentType string, params map[string]stri
 }
 
 func parseMixed(msg io.Reader, boundary string) (files []File, err error) {
-
 	r := multipart.NewReader(msg, boundary)
+
 	for {
 		part, err := r.NextPart()
 		if err != nil {
 			//Если нет вложенного part - прерываем обработку
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
+
 			return files, err
 		}
 
@@ -126,27 +132,30 @@ func parseMixed(msg io.Reader, boundary string) (files []File, err error) {
 				return files, fmt.Errorf(
 					"unknown multipart/mixed nested mime type: %s", contentType)
 			}
+
 			at, err := createAttachment(part)
 			if err != nil {
 				return files, err
 			}
+
 			files = append(files, at)
-
 		}
-
 	}
+
 	return files, err
 }
 
 func parseMultipart(msg io.Reader, boundary string) (files []File, err error) {
 	r := multipart.NewReader(msg, boundary)
+
 	for {
 		part, err := r.NextPart()
 		if err != nil {
 			//Если нет вложенного part - прерываем обработку
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
+
 			return files, err
 		}
 
@@ -163,13 +172,16 @@ func parseMultipart(msg io.Reader, boundary string) (files []File, err error) {
 			if err != nil {
 				return files, err
 			}
+
 			files = append(files, ef...)
+
 		default:
 			if isEmbeddedFile(part) {
 				ef, err := createEmbedded(part)
 				if err != nil {
 					return files, err
 				}
+
 				files = append(files, ef)
 			} else {
 				return files, fmt.Errorf(
@@ -182,10 +194,11 @@ func parseMultipart(msg io.Reader, boundary string) (files []File, err error) {
 }
 
 func createEmbedded(part *multipart.Part) (file File, err error) {
-	cid := decodeMimeSentence(part.Header.Get(contentIdHeader))
+	cid := decodeMimeSentence(part.Header.Get(contentIDHeader))
 	file.Filename = strings.Trim(cid, "<>")
 	file.ContentType = part.Header.Get(contentTypeHeader)
 	file.ContentEncoding = part.Header.Get(contentTransferEncHeader)
+
 	file.Data, err = ioutil.ReadAll(part)
 	if err != nil {
 		return
@@ -198,10 +211,12 @@ func createAttachment(part *multipart.Part) (file File, err error) {
 	file.Filename = decodeMimeSentence(part.FileName())
 	file.ContentType = part.Header.Get(contentTypeHeader)
 	file.ContentEncoding = part.Header.Get(contentTransferEncHeader)
+
 	file.Data, err = ioutil.ReadAll(part)
 	if err != nil {
 		return
 	}
+
 	return file, err
 }
 
@@ -216,8 +231,10 @@ func isEmbeddedFile(part *multipart.Part) bool {
 func decodeMimeSentence(s string) string {
 	ss := strings.Fields(s)
 	result := make([]string, 0, len(ss))
+
 	for _, word := range ss {
 		dec := new(mime.WordDecoder)
+
 		w, err := dec.Decode(word)
 		if err != nil {
 			if len(result) == 0 {
@@ -226,7 +243,9 @@ func decodeMimeSentence(s string) string {
 				w = "_" + word
 			}
 		}
+
 		result = append(result, w)
 	}
+
 	return strings.Join(result, "")
 }

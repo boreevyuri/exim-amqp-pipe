@@ -15,11 +15,11 @@ type ExchangeType string
 //)
 
 type Conf struct {
-	Amqp  AmqpConfig  `yaml:"amqp"`
+	AMQP  AMQPConfig  `yaml:"amqp"`
 	Parse ParseConfig `yaml:"publish"`
 }
 
-type AmqpConfig struct {
+type AMQPConfig struct {
 	URI       string      `yaml:"uri"`
 	QueueBind QueueConfig `yaml:"bindings"`
 }

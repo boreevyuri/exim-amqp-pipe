@@ -7,14 +7,15 @@ import (
 	"log"
 )
 
-func PublishFiles(done chan<- bool, files chan reader.File, config config.AmqpConfig) {
-
+func PublishFiles(done chan<- bool, files chan reader.File, config config.AMQPConfig) {
 	uri, binding := config.URI, config.QueueBind
 	conn, err := amqp.Dial(uri)
+
 	failOnError(err, "Failed to connect to RabbitMQ:")
 	defer conn.Close()
 
 	ch, err := conn.Channel()
+
 	failOnError(err, "Failed to open channel:")
 	defer ch.Close()
 
@@ -46,12 +47,8 @@ func PublishFiles(done chan<- bool, files chan reader.File, config config.AmqpCo
 		if err != nil {
 			failOnError(err, "Failed to publish message:")
 		}
-		//fmt.Printf("Data published\n")
 	}
-
-	//fmt.Printf("Incoming channel closed. Publisher exited\n")
 	done <- true
-
 }
 
 func failOnError(err error, msg string) {

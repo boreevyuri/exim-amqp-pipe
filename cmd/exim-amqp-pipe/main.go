@@ -25,7 +25,7 @@ func main() {
 	donePublish := make(chan bool)
 	files := make(chan reader.File)
 
-	go publisher.PublishFiles(donePublish, files, conf.Amqp)
+	go publisher.PublishFiles(donePublish, files, conf.AMQP)
 	go reader.Parse(files, conf.Parse)
 
 	<-donePublish

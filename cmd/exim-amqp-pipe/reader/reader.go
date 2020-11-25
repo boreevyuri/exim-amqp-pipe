@@ -25,15 +25,12 @@ func ReadStdin() (msg *mail.Message) {
 }
 
 func Parse(files chan File, conf config.ParseConfig) {
-
 	msg := ReadStdin()
 	fileSlice := ScanEmail(conf, msg)
 
 	for _, file := range fileSlice {
-		//fmt.Printf("Got file with name %s\n", file.Filenaeme)
 		files <- file
 	}
-	//fmt.Printf("All files gone. Closing Parse\n")
 	close(files)
 }
 
