@@ -25,6 +25,7 @@ const (
 )
 
 type File struct {
+	Rcpt            string
 	Filename        string
 	ContentType     string
 	ContentEncoding string
@@ -60,6 +61,7 @@ func ScanFullLetter(msg *mail.Message) (files []File, err error) {
 	}
 
 	fileName := msg.Header.Get("Message-ID")
+	data.Rcpt = msg.Header.Get("To")
 	if len(fileName) == 0 {
 		fileName = decodeMimeSentence(msg.Header.Get("From"))
 	}
@@ -79,11 +81,14 @@ func GetFilesFrom(msg *mail.Message) (files []File, err error) {
 	contentType, params, err := parseContentType(msg.Header.Get(contentTypeHeader))
 	failOnError(err, "Unable to parse email Content-Type")
 
+	//TODO: maybe context?
+	rcptHeader := msg.Header.Get("To")
+
 	switch contentType {
 	case mixed:
-		files, err = parseMixed(msg.Body, params[boundaryParam])
+		files, err = parseMixed(msg.Body, params[boundaryParam], rcptHeader)
 	case alternative, related:
-		files, err = parseMultipart(msg.Body, params[boundaryParam])
+		files, err = parseMultipart(msg.Body, params[boundaryParam], rcptHeader)
 	default:
 		return
 	}
@@ -100,7 +105,7 @@ func parseContentType(header string) (contentType string, params map[string]stri
 	return mime.ParseMediaType(header)
 }
 
-func parseMixed(msg io.Reader, boundary string) (files []File, err error) {
+func parseMixed(msg io.Reader, boundary string, rcptHeader string) (files []File, err error) {
 	r := multipart.NewReader(msg, boundary)
 
 	for {
@@ -123,7 +128,7 @@ func parseMixed(msg io.Reader, boundary string) (files []File, err error) {
 		case plain, html:
 			break
 		case alternative, related:
-			files, err = parseMultipart(part, params[boundaryParam])
+			files, err = parseMultipart(part, params[boundaryParam], rcptHeader)
 			if err != nil {
 				return files, err
 			}
@@ -133,7 +138,7 @@ func parseMixed(msg io.Reader, boundary string) (files []File, err error) {
 					"unknown multipart/mixed nested mime type: %s", contentType)
 			}
 
-			at, err := createAttachment(part)
+			at, err := createAttachment(part, rcptHeader)
 			if err != nil {
 				return files, err
 			}
@@ -145,7 +150,7 @@ func parseMixed(msg io.Reader, boundary string) (files []File, err error) {
 	return files, err
 }
 
-func parseMultipart(msg io.Reader, boundary string) (files []File, err error) {
+func parseMultipart(msg io.Reader, boundary string, rcptHeader string) (files []File, err error) {
 	r := multipart.NewReader(msg, boundary)
 
 	for {
@@ -168,7 +173,7 @@ func parseMultipart(msg io.Reader, boundary string) (files []File, err error) {
 		case plain, html:
 			break
 		case related, alternative:
-			ef, err := parseMultipart(part, params[boundaryParam])
+			ef, err := parseMultipart(part, params[boundaryParam], rcptHeader)
 			if err != nil {
 				return files, err
 			}
@@ -177,7 +182,7 @@ func parseMultipart(msg io.Reader, boundary string) (files []File, err error) {
 
 		default:
 			if isEmbeddedFile(part) {
-				ef, err := createEmbedded(part)
+				ef, err := createEmbedded(part, rcptHeader)
 				if err != nil {
 					return files, err
 				}
@@ -193,11 +198,12 @@ func parseMultipart(msg io.Reader, boundary string) (files []File, err error) {
 	return files, err
 }
 
-func createEmbedded(part *multipart.Part) (file File, err error) {
+func createEmbedded(part *multipart.Part, rcptHeader string) (file File, err error) {
 	cid := decodeMimeSentence(part.Header.Get(contentIDHeader))
 	file.Filename = strings.Trim(cid, "<>")
 	file.ContentType = part.Header.Get(contentTypeHeader)
 	file.ContentEncoding = part.Header.Get(contentTransferEncHeader)
+	file.Rcpt = rcptHeader
 
 	file.Data, err = ioutil.ReadAll(part)
 	if err != nil {
@@ -207,10 +213,11 @@ func createEmbedded(part *multipart.Part) (file File, err error) {
 	return file, err
 }
 
-func createAttachment(part *multipart.Part) (file File, err error) {
+func createAttachment(part *multipart.Part, rcptHeader string) (file File, err error) {
 	file.Filename = decodeMimeSentence(part.FileName())
 	file.ContentType = part.Header.Get(contentTypeHeader)
 	file.ContentEncoding = part.Header.Get(contentTransferEncHeader)
+	file.Rcpt = rcptHeader
 
 	file.Data, err = ioutil.ReadAll(part)
 	if err != nil {
