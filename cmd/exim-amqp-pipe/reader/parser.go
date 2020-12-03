@@ -16,20 +16,24 @@ const (
 	contentTypeHeader        = "Content-Type"
 	contentIDHeader          = "Content-Id"
 	contentTransferEncHeader = "Content-Transfer-Encoding"
+	contentDispositionHeader = "Content-Disposition"
 	mixed                    = "multipart/mixed"
 	alternative              = "multipart/alternative"
 	related                  = "multipart/related"
 	html                     = "text/html"
 	plain                    = "text/plain"
+	binary                   = "application/octet-stream"
 	boundaryParam            = "boundary"
 )
 
 type File struct {
-	Rcpt            string
-	Filename        string
-	ContentType     string
-	ContentEncoding string
-	Data            []byte
+	Rcpt               string
+	Sender             string
+	Filename           string
+	ContentType        string
+	ContentDisposition string
+	ContentEncoding    string
+	Data               []byte
 }
 
 func ScanEmail(conf config.ParseConfig, msg *mail.Message) (files []File) {
@@ -61,7 +65,9 @@ func ScanFullLetter(msg *mail.Message) (files []File, err error) {
 	}
 
 	fileName := msg.Header.Get("Message-ID")
-	data.Rcpt = msg.Header.Get("To")
+	data.Sender = msg.Header.Get("From")
+	data.Rcpt = getRecipients(&msg.Header)
+
 	if len(fileName) == 0 {
 		fileName = decodeMimeSentence(msg.Header.Get("From"))
 	}
@@ -81,8 +87,8 @@ func GetFilesFrom(msg *mail.Message) (files []File, err error) {
 	contentType, params, err := parseContentType(msg.Header.Get(contentTypeHeader))
 	failOnError(err, "Unable to parse email Content-Type")
 
-	//TODO: maybe context?
-	rcptHeader := msg.Header.Get("To")
+	//senderHeader := msg.Header.Get("From")
+	rcptHeader := getRecipients(&msg.Header)
 
 	switch contentType {
 	case mixed:
@@ -121,7 +127,7 @@ func parseMixed(msg io.Reader, boundary string, rcptHeader string) (files []File
 
 		contentType, params, err := mime.ParseMediaType(part.Header.Get(contentTypeHeader))
 		if err != nil {
-			return files, err
+			contentType = binary
 		}
 
 		switch contentType {
@@ -203,6 +209,7 @@ func createEmbedded(part *multipart.Part, rcptHeader string) (file File, err err
 	file.Filename = strings.Trim(cid, "<>")
 	file.ContentType = part.Header.Get(contentTypeHeader)
 	file.ContentEncoding = part.Header.Get(contentTransferEncHeader)
+	file.ContentDisposition = part.Header.Get(contentDispositionHeader)
 	file.Rcpt = rcptHeader
 
 	file.Data, err = ioutil.ReadAll(part)
@@ -216,7 +223,11 @@ func createEmbedded(part *multipart.Part, rcptHeader string) (file File, err err
 func createAttachment(part *multipart.Part, rcptHeader string) (file File, err error) {
 	file.Filename = decodeMimeSentence(part.FileName())
 	file.ContentType = part.Header.Get(contentTypeHeader)
+	if file.ContentType == "" {
+		file.ContentType = binary + "; name=\"unknown\""
+	}
 	file.ContentEncoding = part.Header.Get(contentTransferEncHeader)
+	file.ContentDisposition = part.Header.Get(contentDispositionHeader)
 	file.Rcpt = rcptHeader
 
 	file.Data, err = ioutil.ReadAll(part)
@@ -255,4 +266,26 @@ func decodeMimeSentence(s string) string {
 	}
 
 	return strings.Join(result, "")
+}
+
+func getRecipients(head *mail.Header) (rcpts string) {
+	var rcptHeaders = [...]string{
+		"To",
+		"Envelope-To",
+		"X-Envelope-To",
+		"Cc",
+		"Bcc",
+	}
+
+	for _, h := range rcptHeaders {
+		t, _ := head.AddressList(h)
+		for i, addr := range t {
+			if i != 0 {
+				rcpts = rcpts + ", "
+			}
+			rcpts = rcpts + addr.Address
+		}
+	}
+
+	return rcpts
 }

@@ -33,8 +33,9 @@ func PublishFiles(done chan<- bool, files chan reader.File, config config.AMQPCo
 
 	for file := range files {
 		//fmt.Printf("Incoming File %d bytes, name: %s\n", len(file.Data), file.Filename)
-		rcpt := map[string]interface{}{
-			"Rcpt-to": file.Rcpt,
+		headers := map[string]interface{}{
+			"Rcpt-to":             file.Rcpt,
+			"Content-Disposition": file.ContentDisposition,
 		}
 		err := ch.Publish(
 			"",
@@ -42,7 +43,7 @@ func PublishFiles(done chan<- bool, files chan reader.File, config config.AMQPCo
 			false,
 			false,
 			amqp.Publishing{
-				Headers:         rcpt,
+				Headers:         headers,
 				ContentType:     file.ContentType,
 				ContentEncoding: file.ContentEncoding,
 				Body:            file.Data,

@@ -22,11 +22,13 @@ func main() {
 
 	conf.GetConf(confFile)
 
-	donePublish := make(chan bool)
-	files := make(chan reader.File)
+	emlFiles := flag.Args()
 
-	go publisher.PublishFiles(donePublish, files, conf.AMQP)
-	go reader.Parse(files, conf.Parse)
+	donePublish := make(chan bool)
+	filesChan := make(chan reader.File)
+
+	go publisher.PublishFiles(donePublish, filesChan, conf.AMQP)
+	go reader.ReadInput(filesChan, emlFiles, conf.Parse)
 
 	<-donePublish
 }
