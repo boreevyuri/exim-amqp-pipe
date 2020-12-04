@@ -41,7 +41,7 @@ func readFile(filename string) (msg *mail.Message) {
 	return msg
 }
 
-func ReadInput(files chan File, emlFiles []string, conf config.ParseConfig) {
+func ReadInput(out chan Email, emlFiles []string, conf config.ParseConfig) {
 	var msg *mail.Message
 	messages := make([]*mail.Message, 0, 1)
 
@@ -56,12 +56,13 @@ func ReadInput(files chan File, emlFiles []string, conf config.ParseConfig) {
 	}
 
 	for _, msg := range messages {
-		fileSlice := ScanEmail(conf, msg)
-		for _, file := range fileSlice {
-			files <- file
+		email, err := ScanEmail(conf, msg)
+		if err != nil {
+			failOnError(err, "oops")
 		}
+		out <- email
 	}
-	close(files)
+	close(out)
 
 }
 

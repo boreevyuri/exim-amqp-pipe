@@ -25,10 +25,10 @@ func main() {
 	emlFiles := flag.Args()
 
 	donePublish := make(chan bool)
-	filesChan := make(chan reader.File)
+	emailChan := make(chan reader.Email)
 
-	go publisher.PublishFiles(donePublish, filesChan, conf.AMQP)
-	go reader.ReadInput(filesChan, emlFiles, conf.Parse)
+	go publisher.PublishFiles(donePublish, emailChan, conf.AMQP)
+	go reader.ReadInput(emailChan, emlFiles, conf.Parse)
 
 	<-donePublish
 }

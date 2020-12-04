@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/config"
+	"golang.org/x/net/html/charset"
 	"io"
 	"io/ioutil"
 	"mime"
@@ -26,9 +27,13 @@ const (
 	boundaryParam            = "boundary"
 )
 
+type Email struct {
+	Sender      string
+	Rcpt        string
+	Attachments []File
+}
+
 type File struct {
-	Rcpt               string
-	Sender             string
 	Filename           string
 	ContentType        string
 	ContentDisposition string
@@ -36,24 +41,25 @@ type File struct {
 	Data               []byte
 }
 
-func ScanEmail(conf config.ParseConfig, msg *mail.Message) (files []File) {
+func ScanEmail(conf config.ParseConfig, msg *mail.Message) (email Email, err error) {
+	var files []File
 	switch conf.AttachmentsOnly {
 	case true:
-		files, err := GetFilesFrom(msg)
-		if err != nil {
-			failOnError(err, "Unable to parse email:")
-		}
-
-		return files
-
+		files, err = GetFilesFrom(msg)
 	default:
-		files, err := ScanFullLetter(msg)
-		if err != nil {
-			failOnError(err, "Unable to parse email:")
-		}
-
-		return files
+		files, err = ScanFullLetter(msg)
 	}
+	if err != nil {
+		failOnError(err, "Unable to parse email:")
+	}
+
+	email = Email{
+		Sender:      decodeMimeSentence(msg.Header.Get("From")),
+		Rcpt:        getRecipients(&msg.Header),
+		Attachments: files,
+	}
+
+	return email, nil
 }
 
 func ScanFullLetter(msg *mail.Message) (files []File, err error) {
@@ -65,8 +71,6 @@ func ScanFullLetter(msg *mail.Message) (files []File, err error) {
 	}
 
 	fileName := msg.Header.Get("Message-ID")
-	data.Sender = msg.Header.Get("From")
-	data.Rcpt = getRecipients(&msg.Header)
 
 	if len(fileName) == 0 {
 		fileName = decodeMimeSentence(msg.Header.Get("From"))
@@ -87,14 +91,11 @@ func GetFilesFrom(msg *mail.Message) (files []File, err error) {
 	contentType, params, err := parseContentType(msg.Header.Get(contentTypeHeader))
 	failOnError(err, "Unable to parse email Content-Type")
 
-	//senderHeader := msg.Header.Get("From")
-	rcptHeader := getRecipients(&msg.Header)
-
 	switch contentType {
 	case mixed:
-		files, err = parseMixed(msg.Body, params[boundaryParam], rcptHeader)
+		files, err = parseMixed(msg.Body, params[boundaryParam])
 	case alternative, related:
-		files, err = parseMultipart(msg.Body, params[boundaryParam], rcptHeader)
+		files, err = parseMultipart(msg.Body, params[boundaryParam])
 	default:
 		return
 	}
@@ -111,7 +112,7 @@ func parseContentType(header string) (contentType string, params map[string]stri
 	return mime.ParseMediaType(header)
 }
 
-func parseMixed(msg io.Reader, boundary string, rcptHeader string) (files []File, err error) {
+func parseMixed(msg io.Reader, boundary string) (files []File, err error) {
 	r := multipart.NewReader(msg, boundary)
 
 	for {
@@ -134,7 +135,7 @@ func parseMixed(msg io.Reader, boundary string, rcptHeader string) (files []File
 		case plain, html:
 			break
 		case alternative, related:
-			files, err = parseMultipart(part, params[boundaryParam], rcptHeader)
+			files, err = parseMultipart(part, params[boundaryParam])
 			if err != nil {
 				return files, err
 			}
@@ -144,7 +145,7 @@ func parseMixed(msg io.Reader, boundary string, rcptHeader string) (files []File
 					"unknown multipart/mixed nested mime type: %s", contentType)
 			}
 
-			at, err := createAttachment(part, rcptHeader)
+			at, err := createAttachment(part)
 			if err != nil {
 				return files, err
 			}
@@ -156,7 +157,7 @@ func parseMixed(msg io.Reader, boundary string, rcptHeader string) (files []File
 	return files, err
 }
 
-func parseMultipart(msg io.Reader, boundary string, rcptHeader string) (files []File, err error) {
+func parseMultipart(msg io.Reader, boundary string) (files []File, err error) {
 	r := multipart.NewReader(msg, boundary)
 
 	for {
@@ -179,7 +180,7 @@ func parseMultipart(msg io.Reader, boundary string, rcptHeader string) (files []
 		case plain, html:
 			break
 		case related, alternative:
-			ef, err := parseMultipart(part, params[boundaryParam], rcptHeader)
+			ef, err := parseMultipart(part, params[boundaryParam])
 			if err != nil {
 				return files, err
 			}
@@ -188,7 +189,7 @@ func parseMultipart(msg io.Reader, boundary string, rcptHeader string) (files []
 
 		default:
 			if isEmbeddedFile(part) {
-				ef, err := createEmbedded(part, rcptHeader)
+				ef, err := createEmbedded(part)
 				if err != nil {
 					return files, err
 				}
@@ -204,13 +205,12 @@ func parseMultipart(msg io.Reader, boundary string, rcptHeader string) (files []
 	return files, err
 }
 
-func createEmbedded(part *multipart.Part, rcptHeader string) (file File, err error) {
+func createEmbedded(part *multipart.Part) (file File, err error) {
 	cid := decodeMimeSentence(part.Header.Get(contentIDHeader))
 	file.Filename = strings.Trim(cid, "<>")
 	file.ContentType = part.Header.Get(contentTypeHeader)
 	file.ContentEncoding = part.Header.Get(contentTransferEncHeader)
 	file.ContentDisposition = part.Header.Get(contentDispositionHeader)
-	file.Rcpt = rcptHeader
 
 	file.Data, err = ioutil.ReadAll(part)
 	if err != nil {
@@ -220,7 +220,7 @@ func createEmbedded(part *multipart.Part, rcptHeader string) (file File, err err
 	return file, err
 }
 
-func createAttachment(part *multipart.Part, rcptHeader string) (file File, err error) {
+func createAttachment(part *multipart.Part) (file File, err error) {
 	file.Filename = decodeMimeSentence(part.FileName())
 	file.ContentType = part.Header.Get(contentTypeHeader)
 	if file.ContentType == "" {
@@ -228,8 +228,6 @@ func createAttachment(part *multipart.Part, rcptHeader string) (file File, err e
 	}
 	file.ContentEncoding = part.Header.Get(contentTransferEncHeader)
 	file.ContentDisposition = part.Header.Get(contentDispositionHeader)
-	file.Rcpt = rcptHeader
-
 	file.Data, err = ioutil.ReadAll(part)
 	if err != nil {
 		return
@@ -246,12 +244,18 @@ func isEmbeddedFile(part *multipart.Part) bool {
 	return part.Header.Get(contentTransferEncHeader) != ""
 }
 
+var CharsetReader = func(label string, input io.Reader) (io.Reader, error) {
+	label = strings.Replace(label, "windows-", "cp", -1)
+	encoding, _ := charset.Lookup(label)
+	return encoding.NewDecoder().Reader(input), nil
+}
+
 func decodeMimeSentence(s string) string {
 	ss := strings.Fields(s)
 	result := make([]string, 0, len(ss))
 
 	for _, word := range ss {
-		dec := new(mime.WordDecoder)
+		dec := mime.WordDecoder{CharsetReader: CharsetReader}
 
 		w, err := dec.Decode(word)
 		if err != nil {
@@ -267,6 +271,15 @@ func decodeMimeSentence(s string) string {
 
 	return strings.Join(result, "")
 }
+
+//func decodeHeader(s string) string {
+//	dec := mime.WordDecoder{CharsetReader: CharsetReader}
+//	header, err := dec.DecodeHeader(s)
+//	if err != nil {
+//		return s
+//	}
+//	return header
+//}
 
 func getRecipients(head *mail.Header) (rcpts string) {
 	var rcptHeaders = [...]string{

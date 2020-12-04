@@ -7,7 +7,7 @@ import (
 	"log"
 )
 
-func PublishFiles(done chan<- bool, files chan reader.File, config config.AMQPConfig) {
+func PublishFiles(done chan<- bool, emails chan reader.Email, config config.AMQPConfig) {
 	uri, binding := config.URI, config.QueueBind
 	conn, err := amqp.Dial(uri)
 
@@ -29,29 +29,31 @@ func PublishFiles(done chan<- bool, files chan reader.File, config config.AMQPCo
 	)
 	failOnError(err, "Failed to declare a queue:")
 
-	//fmt.Printf("Connection successful. Publisher waits for data...\n")
+	for email := range emails {
+		h := map[string]interface{}{
+			"Rcpt-to": email.Rcpt,
+			"From":    email.Sender,
+		}
+		for _, at := range email.Attachments {
 
-	for file := range files {
-		//fmt.Printf("Incoming File %d bytes, name: %s\n", len(file.Data), file.Filename)
-		headers := map[string]interface{}{
-			"Rcpt-to":             file.Rcpt,
-			"Content-Disposition": file.ContentDisposition,
+			h["Content-Disposition"] = at.ContentDisposition
+			err := ch.Publish(
+				"",
+				binding.QueueName,
+				false,
+				false,
+				amqp.Publishing{
+					Headers:         h,
+					ContentType:     at.ContentType,
+					ContentEncoding: at.ContentEncoding,
+					Body:            at.Data,
+				},
+			)
+			if err != nil {
+				failOnError(err, "Failed to publish message:")
+			}
 		}
-		err := ch.Publish(
-			"",
-			binding.QueueName,
-			false,
-			false,
-			amqp.Publishing{
-				Headers:         headers,
-				ContentType:     file.ContentType,
-				ContentEncoding: file.ContentEncoding,
-				Body:            file.Data,
-			},
-		)
-		if err != nil {
-			failOnError(err, "Failed to publish message:")
-		}
+
 	}
 	done <- true
 }
