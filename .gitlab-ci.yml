@@ -13,6 +13,8 @@ variables:
 
 build-go:
   stage: build
+  only:
+    - main
   image: golang:1.15.5-alpine
   before_script:
     - go mod vendor
@@ -26,6 +28,8 @@ build-go:
 
 build-rpm:
   stage: build-rpm
+  only:
+    - main
   image: perconalab/rpmbuild:latest
   before_script:
     - mkdir -p ${BUILD_RPM_PATH}/SOURCES
