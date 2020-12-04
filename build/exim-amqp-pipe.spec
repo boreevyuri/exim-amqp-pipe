@@ -1,7 +1,7 @@
 
 Name: exim-amqp-pipe
 Version: 0.0.1
-Release: 1%{?dist}
+Release: 2%{?dist}
 Summary: Publish emails or attachments to RabbitMQ
 
 License: MIT License

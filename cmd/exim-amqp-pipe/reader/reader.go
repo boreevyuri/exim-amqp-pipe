@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/mail"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -24,6 +25,42 @@ func ReadStdin() (msg *mail.Message) {
 	failOnError(err, "Unable to read mail from os.Stdin:")
 
 	return msg
+}
+
+func readDir(path string) []*mail.Message {
+	msgs := make([]*mail.Message, 0, 1)
+	file, err := os.Open(path)
+	failOnError(err, "unable to open")
+	defer func() {
+		err := file.Close()
+		failOnError(err, "unable to close")
+	}()
+
+	fi, err := file.Stat()
+	failOnError(err, "unable to stat")
+
+	var walkFunc = func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		msg := readFile(path)
+		msgs = append(msgs, msg)
+		return nil
+	}
+
+	switch {
+	case fi.IsDir():
+		err := filepath.Walk(path, walkFunc)
+		failOnError(err, "unable to filepath.Walk")
+	default:
+		msg := readFile(path)
+		msgs = append(msgs, msg)
+	}
+
+	return msgs
 }
 
 func readFile(filename string) (msg *mail.Message) {
@@ -51,8 +88,8 @@ func ReadInput(out chan Email, emlFiles []string, conf config.ParseConfig) {
 	}
 
 	for _, filename := range emlFiles {
-		msg = readFile(filename)
-		messages = append(messages, msg)
+		msg := readDir(filename)
+		messages = append(messages, msg...)
 	}
 
 	for _, msg := range messages {
