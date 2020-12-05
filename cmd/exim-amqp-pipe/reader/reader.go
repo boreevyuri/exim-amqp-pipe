@@ -3,12 +3,10 @@ package reader
 import (
 	"errors"
 	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/config"
-	"io/ioutil"
 	"log"
 	"net/mail"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 func ReadStdin() (msg *mail.Message) {
@@ -27,8 +25,7 @@ func ReadStdin() (msg *mail.Message) {
 	return msg
 }
 
-func readDir(path string) []*mail.Message {
-	msgs := make([]*mail.Message, 0, 1)
+func readDir(job chan<- *mail.Message, path string) {
 	file, err := os.Open(path)
 	failOnError(err, "unable to open")
 	defer func() {
@@ -46,8 +43,14 @@ func readDir(path string) []*mail.Message {
 		if info.IsDir() {
 			return nil
 		}
-		msg := readFile(path)
-		msgs = append(msgs, msg)
+		if filepath.Ext(path) == ".eml" {
+			file, err := os.Open(path)
+			failOnError(err, "unable to open file")
+			//defer file.Close()
+			m, err := mail.ReadMessage(file)
+			failOnError(err, "unable to parse mail message")
+			job <- m
+		}
 		return nil
 	}
 
@@ -56,47 +59,36 @@ func readDir(path string) []*mail.Message {
 		err := filepath.Walk(path, walkFunc)
 		failOnError(err, "unable to filepath.Walk")
 	default:
-		msg := readFile(path)
-		msgs = append(msgs, msg)
+		file, err := os.Open(path)
+		failOnError(err, "unable to open file")
+		//defer file.Close()
+		m, err := mail.ReadMessage(file)
+		failOnError(err, "unable to parse mail message")
+		job <- m
 	}
 
-	return msgs
-}
-
-func readFile(filename string) (msg *mail.Message) {
-	file, err := os.Open(filename)
-	failOnError(err, "unable to open file")
-	defer func() {
-		err := file.Close()
-		failOnError(err, "unable to close file")
-	}()
-
-	data, err := ioutil.ReadAll(file)
-	msg, err = mail.ReadMessage(strings.NewReader(string(data)))
-	failOnError(err, "unable to parse mail message")
-
-	return msg
+	close(job)
 }
 
 func ReadInput(out chan Email, emlFiles []string, conf config.ParseConfig) {
-	var msg *mail.Message
-	messages := make([]*mail.Message, 0, 1)
+	//var msg *mail.Message
+	//messages := make([]*mail.Message, 0, 1)
 
-	if len(emlFiles) == 0 {
-		msg = ReadStdin()
-		messages = append(messages, msg)
-	}
+	//if len(emlFiles) == 0 {
+	//	msg = ReadStdin()
+	//	messages = append(messages, msg)
+	//}
+
+	mailChan := make(chan *mail.Message)
 
 	for _, filename := range emlFiles {
-		msg := readDir(filename)
-		messages = append(messages, msg...)
+		go readDir(mailChan, filename)
+		//messages = append(messages, msg...)
 	}
 
-	for _, msg := range messages {
+	for msg := range mailChan {
 		email, err := ScanEmail(conf, msg)
-		if err != nil {
-			failOnError(err, "oops")
-		}
+		failOnError(err, "ooops")
 		out <- email
 	}
 	close(out)

@@ -12,12 +12,12 @@ func PublishFiles(done chan<- bool, emails chan reader.Email, config config.AMQP
 	conn, err := amqp.Dial(uri)
 
 	failOnError(err, "Failed to connect to RabbitMQ:")
-	defer conn.Close()
+	//defer conn.Close()
 
 	ch, err := conn.Channel()
 
 	failOnError(err, "Failed to open channel:")
-	defer ch.Close()
+	//defer ch.Close()
 
 	_, err = ch.QueueDeclare(
 		binding.QueueName,
@@ -55,6 +55,8 @@ func PublishFiles(done chan<- bool, emails chan reader.Email, config config.AMQP
 		}
 
 	}
+	ch.Close()
+	conn.Close()
 	done <- true
 }
 
