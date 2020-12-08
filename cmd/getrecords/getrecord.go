@@ -6,14 +6,15 @@ import (
 )
 
 func main() {
-
 	uri := "amqp://guest:guest@127.0.0.1:5672/exim"
 	conn, err := amqp.Dial(uri)
 	failOnError(err, "Failed to connect to RabbitMQ:")
+
 	defer conn.Close()
 
 	ch, err := conn.Channel()
 	failOnError(err, "Failed to open channel:")
+
 	defer ch.Close()
 
 	_, err = ch.QueueDeclare(

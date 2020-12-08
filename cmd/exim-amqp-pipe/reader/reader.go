@@ -28,6 +28,7 @@ func ReadStdin() (msg *mail.Message) {
 func readDir(job chan<- *mail.Message, path string) {
 	file, err := os.Open(path)
 	failOnError(err, "unable to open")
+
 	defer func() {
 		err := file.Close()
 		failOnError(err, "unable to close")
@@ -83,7 +84,6 @@ func ReadInput(out chan Email, emlFiles []string, conf config.ParseConfig) {
 
 	for _, filename := range emlFiles {
 		go readDir(mailChan, filename)
-		//messages = append(messages, msg...)
 	}
 
 	for msg := range mailChan {
@@ -91,8 +91,8 @@ func ReadInput(out chan Email, emlFiles []string, conf config.ParseConfig) {
 		failOnError(err, "ooops")
 		out <- email
 	}
-	close(out)
 
+	close(out)
 }
 
 func failOnError(err error, msg string) {

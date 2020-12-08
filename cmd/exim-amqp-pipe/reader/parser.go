@@ -43,12 +43,14 @@ type File struct {
 
 func ScanEmail(conf config.ParseConfig, msg *mail.Message) (email Email, err error) {
 	var files []File
+
 	switch conf.AttachmentsOnly {
 	case true:
 		files, err = GetFilesFrom(msg)
 	default:
 		files, err = ScanFullLetter(msg)
 	}
+
 	if err != nil {
 		failOnError(err, "Unable to parse email:")
 	}
@@ -222,12 +224,16 @@ func createEmbedded(part *multipart.Part) (file File, err error) {
 
 func createAttachment(part *multipart.Part) (file File, err error) {
 	file.Filename = decodeMimeSentence(part.FileName())
+
 	file.ContentType = part.Header.Get(contentTypeHeader)
 	if file.ContentType == "" {
 		file.ContentType = binary + "; name=\"unknown\""
 	}
+
 	file.ContentEncoding = part.Header.Get(contentTransferEncHeader)
+
 	file.ContentDisposition = part.Header.Get(contentDispositionHeader)
+
 	file.Data, err = ioutil.ReadAll(part)
 	if err != nil {
 		return
@@ -302,10 +308,12 @@ func GetRecipients(head *mail.Header) (rcpts string) {
 			}
 		}
 	}
+
 	for _, key := range addrs {
 		if rcpts != "" {
 			rcpts = rcpts + ", "
 		}
+
 		rcpts = rcpts + key
 	}
 

@@ -10,14 +10,10 @@ import (
 func PublishFiles(done chan<- bool, emails chan reader.Email, config config.AMQPConfig) {
 	uri, binding := config.URI, config.QueueBind
 	conn, err := amqp.Dial(uri)
-
 	failOnError(err, "Failed to connect to RabbitMQ:")
-	//defer conn.Close()
 
 	ch, err := conn.Channel()
-
 	failOnError(err, "Failed to open channel:")
-	//defer ch.Close()
 
 	_, err = ch.QueueDeclare(
 		binding.QueueName,
@@ -35,7 +31,6 @@ func PublishFiles(done chan<- bool, emails chan reader.Email, config config.AMQP
 			"From":    email.Sender,
 		}
 		for _, at := range email.Attachments {
-
 			h["Content-Disposition"] = at.ContentDisposition
 			err := ch.Publish(
 				"",
@@ -49,14 +44,16 @@ func PublishFiles(done chan<- bool, emails chan reader.Email, config config.AMQP
 					Body:            at.Data,
 				},
 			)
-			if err != nil {
-				failOnError(err, "Failed to publish message:")
-			}
+			failOnError(err, "Failed to publish message:")
 		}
-
 	}
-	ch.Close()
-	conn.Close()
+
+	err = ch.Close()
+	failOnError(err, "amqp channel already closed")
+
+	err = conn.Close()
+	failOnError(err, "amqp connection already closed")
+
 	done <- true
 }
 
