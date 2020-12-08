@@ -55,7 +55,7 @@ func ScanEmail(conf config.ParseConfig, msg *mail.Message) (email Email, err err
 
 	email = Email{
 		Sender:      decodeMimeSentence(msg.Header.Get("From")),
-		Rcpt:        getRecipients(&msg.Header),
+		Rcpt:        GetRecipients(&msg.Header),
 		Attachments: files,
 	}
 
@@ -281,7 +281,7 @@ func decodeMimeSentence(s string) string {
 //	return header
 //}
 
-func getRecipients(head *mail.Header) (rcpts string) {
+func GetRecipients(head *mail.Header) (rcpts string) {
 	var rcptHeaders = [...]string{
 		"To",
 		"Envelope-To",
@@ -290,14 +290,23 @@ func getRecipients(head *mail.Header) (rcpts string) {
 		"Bcc",
 	}
 
+	unique := make(map[string]bool)
+	addrs := make([]string, 0, 1)
+
 	for _, h := range rcptHeaders {
 		t, _ := head.AddressList(h)
-		for i, addr := range t {
-			if i != 0 {
-				rcpts = rcpts + ", "
+		for _, addr := range t {
+			if !unique[addr.Address] {
+				addrs = append(addrs, addr.Address)
+				unique[addr.Address] = true
 			}
-			rcpts = rcpts + addr.Address
 		}
+	}
+	for _, key := range addrs {
+		if rcpts != "" {
+			rcpts = rcpts + ", "
+		}
+		rcpts = rcpts + key
 	}
 
 	return rcpts
