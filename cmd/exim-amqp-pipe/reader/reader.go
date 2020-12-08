@@ -9,20 +9,40 @@ import (
 	"path/filepath"
 )
 
-func ReadStdin() (msg *mail.Message) {
+func ReadInput(out chan Email, emlFiles []string, conf config.ParseConfig) {
+	mailChan := make(chan *mail.Message)
+
+	if len(emlFiles) > 0 {
+		for _, filename := range emlFiles {
+			go readDir(mailChan, filename)
+		}
+	} else {
+		go readStdin(mailChan)
+	}
+
+	for msg := range mailChan {
+		email, err := ScanEmail(conf, msg)
+		failOnError(err, "ooops")
+		out <- email
+	}
+
+	close(out)
+}
+
+func readStdin(job chan<- *mail.Message) {
 	var errInput = errors.New("no input specified")
 
 	inputData, err := os.Stdin.Stat()
-	failOnError(err, "no input specified(1):")
+	failOnError(err, "no input specified(1)")
 
 	if (inputData.Mode() & os.ModeNamedPipe) == 0 {
 		failOnError(errInput, "no pipe")
 	}
 
-	msg, err = mail.ReadMessage(os.Stdin)
-	failOnError(err, "Unable to read mail from os.Stdin:")
+	msg, err := mail.ReadMessage(os.Stdin)
+	failOnError(err, "Unable to read mail from os.Stdin")
 
-	return msg
+	job <- msg
 }
 
 func readDir(job chan<- *mail.Message, path string) {
@@ -69,30 +89,6 @@ func readDir(job chan<- *mail.Message, path string) {
 	}
 
 	close(job)
-}
-
-func ReadInput(out chan Email, emlFiles []string, conf config.ParseConfig) {
-	//var msg *mail.Message
-	//messages := make([]*mail.Message, 0, 1)
-
-	//if len(emlFiles) == 0 {
-	//	msg = ReadStdin()
-	//	messages = append(messages, msg)
-	//}
-
-	mailChan := make(chan *mail.Message)
-
-	for _, filename := range emlFiles {
-		go readDir(mailChan, filename)
-	}
-
-	for msg := range mailChan {
-		email, err := ScanEmail(conf, msg)
-		failOnError(err, "ooops")
-		out <- email
-	}
-
-	close(out)
 }
 
 func failOnError(err error, msg string) {
