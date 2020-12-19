@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-type testpair struct {
+type testPair struct {
 	headers      mail.Header
 	resultString string
 }
@@ -34,7 +34,7 @@ var testHeaders5 = mail.Header{
 	"Envelope-To": {"user@mail.com"},
 }
 
-var headersForTest = []testpair{
+var headersForTest = []testPair{
 	{testHeaders1, "user@mail.com, user2@mail.com, user3@mail.com"},
 	{testHeaders2, "user@mail.com"},
 	{testHeaders3, "user@mail.com, user2@mail.com"},
