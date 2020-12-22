@@ -2,9 +2,9 @@ package publisher
 
 import (
 	"errors"
-	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/streadway/amqp"
+	"os"
 	"time"
 )
 
@@ -18,6 +18,7 @@ var (
 
 const (
 	reconnectDelay = 5 * time.Second
+	maxRetryCount  = 5
 	resendDelay    = 2 * time.Second
 )
 
@@ -57,11 +58,15 @@ func (c *Client) handleReconnect(addr string) {
 	for {
 		c.isConnected = false
 		t := time.Now()
-		fmt.Printf("Attempting to connect to rabbitMQ: %s\n", addr)
+		c.logger.Printf("Attempting to connect to rabbitMQ: %s", addr)
 		var retryCount int
 		for !c.connect(addr) {
-			c.logger.Print("failed to connect. Retrying...")
+			c.logger.Printf("failed to connect. Retrying. %d tries left", maxRetryCount-retryCount)
 			time.Sleep(reconnectDelay + time.Duration(retryCount)*time.Second)
+			if retryCount >= maxRetryCount-1 {
+				c.logger.Printf("unable to connect to rabbitMQ in %d tries. Exiting...", maxRetryCount)
+				os.Exit(1)
+			}
 			retryCount++
 		}
 		c.logger.Printf("Connected to rabbitMQ in: %vms", time.Since(t).Milliseconds())
@@ -79,17 +84,20 @@ func (c *Client) connect(addr string) bool {
 		c.logger.Printf("failed to dial rabbitMQ server: %v", err)
 		return false
 	}
+	c.logger.Printf("successfully connected to %s", addr)
 
 	ch, err := conn.Channel()
 	if err != nil {
 		c.logger.Printf("failed connecting to channel: %v", err)
 		return false
 	}
+	c.logger.Print("successfully created channel")
 
 	err = ch.Confirm(false)
 	if err != nil {
 		c.logger.Print("channel does not acknowledged Confirm")
 	}
+	c.logger.Print("channel acknowledged Confirm")
 
 	// _, err = ch.QueueDeclare(
 	//	listenQueue,
@@ -104,6 +112,7 @@ func (c *Client) connect(addr string) bool {
 	//	return false
 	// }
 
+	c.logger.Print("prepare to declare queue")
 	_, err = ch.QueueDeclare(
 		c.pushQueue,
 		false,
@@ -116,6 +125,7 @@ func (c *Client) connect(addr string) bool {
 		c.logger.Printf("failed to declare push queue: %v", err)
 		return false
 	}
+	c.logger.Print("successfully declared queue")
 
 	c.changeConnection(conn, ch)
 	c.isConnected = true
@@ -136,9 +146,9 @@ func (c *Client) changeConnection(connection *amqp.Connection, channel *amqp.Cha
 // it continuously resends messages until a confirmation is received.
 // This will block until the server sends a confirm.
 func (c *Client) Push(message amqp.Publishing) error {
-	if !c.isConnected {
-		return errors.New("failed to push: not connected")
-	}
+	//if !c.isConnected {
+	//	return errors.New("failed to push: not connected")
+	//}
 
 	for {
 		err := c.UnsafePush(message)

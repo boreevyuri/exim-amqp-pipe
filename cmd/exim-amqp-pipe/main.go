@@ -27,7 +27,6 @@ func main() {
 	donePublish := make(chan bool)
 	emailChan := make(chan reader.Email)
 
-	//go publisher.PublishFiles(donePublish, emailChan, conf.AMQP)
 	go publisher.Publisher(donePublish, emailChan, conf.AMQP)
 	go reader.ReadInput(emailChan, emlFiles, conf.Parse)
 

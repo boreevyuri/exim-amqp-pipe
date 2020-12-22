@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-func ReadInput(out chan Email, emlFiles []string, conf config.ParseConfig) {
+func ReadInput(out chan<- Email, emlFiles []string, conf config.ParseConfig) {
 	mailChan := make(chan *mail.Message)
 
 	if len(emlFiles) > 0 {

@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-func Publisher(done chan<- bool, emails chan reader.Email, config config.AMQPConfig) {
+func Publisher(done chan<- bool, emails <-chan reader.Email, config config.AMQPConfig) {
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 	uri, queue := config.URI, config.QueueBind
 	amqpClient := New(queue.QueueName, uri, logger)
@@ -26,7 +26,10 @@ func Publisher(done chan<- bool, emails chan reader.Email, config config.AMQPCon
 				ContentEncoding: attachment.ContentEncoding,
 				Body:            attachment.Data,
 			}
-			amqpClient.Push(atData)
+			err := amqpClient.Push(atData)
+			if err != nil {
+				amqpClient.logger.Printf("unable to push: %v", err)
+			}
 		}
 	}
 
