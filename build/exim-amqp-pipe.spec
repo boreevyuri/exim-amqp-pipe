@@ -1,7 +1,8 @@
+%define date 20201223
 
 Name: exim-amqp-pipe
 Version: 0.0.1
-Release: 2%{?dist}
+Release: 0.git%{date}.3%{?dist}
 Summary: Publish emails or attachments to RabbitMQ
 
 License: MIT License
