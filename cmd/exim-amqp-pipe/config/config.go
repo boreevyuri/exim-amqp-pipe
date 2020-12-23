@@ -8,11 +8,11 @@ import (
 
 type ExchangeType string
 
-//const (
+// const (
 //	DirectExchangeType ExchangeType = "direct"
 //	FanoutExchangeType ExchangeType = "fanout"
 //	TopicExchangeType  ExchangeType = "topic"
-//)
+// )
 
 type Conf struct {
 	AMQP  AMQPConfig  `yaml:"amqp"`
@@ -25,7 +25,7 @@ type AMQPConfig struct {
 }
 
 type QueueConfig struct {
-	//Name string `yaml:"queue"`
+	// Name string `yaml:"queue"`
 	Exchange  string       `yaml:"exchange"`
 	QueueName string       `yaml:"queue"`
 	Type      ExchangeType `yaml:"type"`

@@ -28,14 +28,14 @@ func Publisher(done chan<- bool, emails <-chan reader.Email, config config.AMQPC
 			}
 			err := amqpClient.Push(atData)
 			if err != nil {
-				amqpClient.logger.Printf("unable to push: %v", err)
+				amqpClient.logger.Printf("Unable to push: %v", err)
 			}
 		}
 	}
 
 	err := amqpClient.Close()
 	if err != nil {
-		logger.Printf("unable to close rabbitMQ connection: %v", err)
+		logger.Printf("Unable to close rabbitMQ connection: %v", err)
 	}
 
 	done <- true
