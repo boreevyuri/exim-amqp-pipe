@@ -1,10 +1,10 @@
 package publisher
 
 import (
-	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/config"
-	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/reader"
+	"exim-amqp-pipe/cmd/exim-amqp-pipe/config"
+	"exim-amqp-pipe/cmd/exim-amqp-pipe/reader"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog"
-	"github.com/streadway/amqp"
 	"os"
 )
 

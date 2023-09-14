@@ -2,11 +2,11 @@ package reader
 
 import (
 	"errors"
+	"exim-amqp-pipe/cmd/exim-amqp-pipe/config"
 	"fmt"
-	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/config"
 	"golang.org/x/net/html/charset"
+
 	"io"
-	"io/ioutil"
 	"mime"
 	"mime/multipart"
 	"net/mail"
@@ -78,7 +78,7 @@ func ScanFullLetter(msg *mail.Message) (files []File, err error) {
 		fileName = decodeMimeSentence(msg.Header.Get("From"))
 	}
 
-	data.Data, err = ioutil.ReadAll(msg.Body)
+	data.Data, err = io.ReadAll(msg.Body)
 
 	data.ContentType = contentType
 	data.Filename = fileName
@@ -120,7 +120,7 @@ func parseMixed(msg io.Reader, boundary string) (files []File, err error) {
 	for {
 		part, err := r.NextPart()
 		if err != nil {
-			//Если нет вложенного part - прерываем обработку
+			// Если нет вложенного part - прерываем обработку
 			if errors.Is(err, io.EOF) {
 				break
 			}
@@ -165,7 +165,7 @@ func parseMultipart(msg io.Reader, boundary string) (files []File, err error) {
 	for {
 		part, err := r.NextPart()
 		if err != nil {
-			//Если нет вложенного part - прерываем обработку
+			// Если нет вложенного part - прерываем обработку
 			if errors.Is(err, io.EOF) {
 				break
 			}
@@ -214,7 +214,7 @@ func createEmbedded(part *multipart.Part) (file File, err error) {
 	file.ContentEncoding = part.Header.Get(contentTransferEncHeader)
 	file.ContentDisposition = part.Header.Get(contentDispositionHeader)
 
-	file.Data, err = ioutil.ReadAll(part)
+	file.Data, err = io.ReadAll(part)
 	if err != nil {
 		return
 	}
@@ -234,7 +234,7 @@ func createAttachment(part *multipart.Part) (file File, err error) {
 
 	file.ContentDisposition = part.Header.Get(contentDispositionHeader)
 
-	file.Data, err = ioutil.ReadAll(part)
+	file.Data, err = io.ReadAll(part)
 	if err != nil {
 		return
 	}
@@ -251,7 +251,7 @@ func isEmbeddedFile(part *multipart.Part) bool {
 }
 
 var CharsetReader = func(label string, input io.Reader) (io.Reader, error) {
-	label = strings.Replace(label, "windows-", "cp", -1)
+	label = strings.ReplaceAll(label, "windows-", "cp")
 	encoding, _ := charset.Lookup(label)
 	return encoding.NewDecoder().Reader(input), nil
 }
@@ -278,14 +278,14 @@ func decodeMimeSentence(s string) string {
 	return strings.Join(result, "")
 }
 
-//func decodeHeader(s string) string {
+// func decodeHeader(s string) string {
 //	dec := mime.WordDecoder{CharsetReader: CharsetReader}
 //	header, err := dec.DecodeHeader(s)
 //	if err != nil {
 //		return s
 //	}
 //	return header
-//}
+// }
 
 func GetRecipients(head *mail.Header) (rcpts string) {
 	var rcptHeaders = [...]string{
@@ -311,10 +311,10 @@ func GetRecipients(head *mail.Header) (rcpts string) {
 
 	for _, key := range addrs {
 		if rcpts != "" {
-			rcpts = rcpts + ", "
+			rcpts += ", "
 		}
 
-		rcpts = rcpts + key
+		rcpts += key
 	}
 
 	return rcpts

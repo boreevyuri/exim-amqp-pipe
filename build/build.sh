@@ -39,5 +39,5 @@ export GO111MODULE=on
 
 go install \
   -installsuffix "static" \
-  -ldflags "-X $(go list -m)/pkg/version.Version=${VERSION}" \
+  -ldflags "-s -w -X $(go list -m)/pkg/version.Version=${VERSION}" \
   ./...

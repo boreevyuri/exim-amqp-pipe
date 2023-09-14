@@ -1,10 +1,10 @@
 package main
 
 import (
+	"exim-amqp-pipe/cmd/exim-amqp-pipe/config"
+	"exim-amqp-pipe/cmd/exim-amqp-pipe/publisher"
+	"exim-amqp-pipe/cmd/exim-amqp-pipe/reader"
 	"flag"
-	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/config"
-	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/publisher"
-	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/reader"
 )
 
 const (

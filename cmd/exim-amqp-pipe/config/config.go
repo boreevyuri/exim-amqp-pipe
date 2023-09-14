@@ -2,8 +2,8 @@ package config
 
 import (
 	"gopkg.in/yaml.v3"
-	"io/ioutil"
 	"log"
+	"os"
 )
 
 type ExchangeType string
@@ -51,7 +51,7 @@ func readConfigFile(filename string) []byte {
 		log.Fatalf("No config file specified")
 	}
 
-	fileBytes, err := ioutil.ReadFile(filename)
+	fileBytes, err := os.ReadFile(filename)
 	if err != nil {
 		log.Fatalf("Config file not found")
 	}

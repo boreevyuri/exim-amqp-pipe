@@ -2,7 +2,7 @@ package reader
 
 import (
 	"errors"
-	"github.com/boreevyuri/exim-amqp-pipe/cmd/exim-amqp-pipe/config"
+	"exim-amqp-pipe/cmd/exim-amqp-pipe/config"
 	"log"
 	"net/mail"
 	"os"
@@ -67,7 +67,7 @@ func readDir(job chan<- *mail.Message, path string) {
 		if filepath.Ext(path) == ".eml" {
 			file, err := os.Open(path)
 			failOnError(err, "unable to open file")
-			//defer file.Close()
+			// defer file.Close()
 			m, err := mail.ReadMessage(file)
 			failOnError(err, "unable to parse mail message")
 			job <- m
@@ -82,7 +82,7 @@ func readDir(job chan<- *mail.Message, path string) {
 	default:
 		file, err := os.Open(path)
 		failOnError(err, "unable to open file")
-		//defer file.Close()
+		// defer file.Close()
 		m, err := mail.ReadMessage(file)
 		failOnError(err, "unable to parse mail message")
 		job <- m

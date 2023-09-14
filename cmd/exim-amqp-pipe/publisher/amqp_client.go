@@ -1,9 +1,10 @@
 package publisher
 
 import (
+	"context"
 	"errors"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog"
-	"github.com/streadway/amqp"
 	"os"
 	"time"
 )
@@ -140,7 +141,7 @@ func (c *Client) changeConnection(connection *amqp.Connection, channel *amqp.Cha
 // Push will push data onto the queue and wait for a confirmation
 // If no confirms are received until within the resendTimeout
 // it continuously resends messages until a confirmation is received.
-// This will block until the server sends a confirm.
+// This will block until the server sends a confirmation.
 func (c *Client) Push(message amqp.Publishing) error {
 	// if !c.isConnected {
 	// 	return errors.New("failed to push: not connected")
@@ -149,7 +150,7 @@ func (c *Client) Push(message amqp.Publishing) error {
 	for {
 		err := c.UnsafePush(message)
 		if err != nil {
-			if err == ErrDisconnected {
+			if errors.Is(err, ErrDisconnected) {
 				continue
 			}
 			return err
@@ -171,7 +172,11 @@ func (c *Client) UnsafePush(message amqp.Publishing) error {
 		return ErrDisconnected
 	}
 
-	return c.channel.Publish(
+	// create simple Background context
+	ctx := context.Background()
+
+	return c.channel.PublishWithContext(
+		ctx,
 		"",
 		c.pushQueue,
 		false,
